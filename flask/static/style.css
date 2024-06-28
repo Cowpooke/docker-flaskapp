@@ -27,13 +27,13 @@
 }
 
 .c-item {
-    height: 280px;
+    height: 340px;
 }
 
 .c-img {
     height: 100%;
     object-fit: cover;
-    filter: brightness(0.6);
+    filter: brightness(1);
 
 }
 
@@ -43,4 +43,15 @@
     border-bottom: 3px solid green;
     border-radius: 0;
     outline: none;
+}
+
+body {
+    margin-bottom: 56px;
+}
+
+.sticky-bottom {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    z-index: 1000;
 }
