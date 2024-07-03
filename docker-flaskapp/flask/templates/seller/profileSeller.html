@@ -1,0 +1,639 @@
+{% extends 'base.html' %}
+
+{% block title %}Profile - Toko Nusantara{% endblock %}
+{% block style %}
+<style>
+    .profileimg {
+        width: 10rem;
+    }
+
+    .desc {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        max-width: 1000px;
+        min-width: 300px;
+    }
+
+    .wicon {
+        width: 1rem;
+    }
+
+    .wket {
+        width: 4rem;
+    }
+
+    .desprofile {
+        display: flex;
+        flex-direction: column;
+        padding-top: 2rem;
+        margin-left: 1rem;
+    }
+
+    .navbar a {
+        float: left;
+        display: block;
+        color: #070707;
+        text-align: center;
+        padding: 14px 16px;
+        text-decoration: none;
+    }
+
+
+
+    .myswitch {
+        width: 100px;
+        height: 50px;
+
+    }
+
+    @media (max-width: 767px) {
+        .desprofile {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .desc {
+            justify-content: center;
+        }
+    }
+</style>
+{% endblock %}
+{% block script %}
+<script>
+    {% if msg %}
+    alert('{{msg}}')
+    window.location.href = '/profile'
+    {% endif %}
+    $(document).ready(function () {
+
+        // Initial setup
+        toggleFields('Semua');
+        kategori("SemuaLink");
+
+        // Handle navbar link click event
+        $('.navbar a').click(function (e) {
+            e.preventDefault();
+            var userType = $(this).attr('id').replace('Link', ''); // Extract 'customer' or 'seller'
+            toggleFields(userType);
+        });
+
+        // Function to toggle fields based on user type
+        function toggleFields(userType) {
+            // Update navbar active state
+            $('.navbar a').removeClass('nav-active');
+            $('#' + userType + 'Link').addClass('nav-active');
+
+        }
+    });
+
+    //  memodifikasi titik pada tiap 3 digit
+    function formatPrice(price) {
+        const formattedPrice = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(price);
+        return formattedPrice.endsWith(',00') ? formattedPrice.slice(0, -3) : formattedPrice;
+    }
+
+    function kategori(id) {
+        // Get the id of the clicked link
+        var category = id.split("Link")[0];
+    
+        // Send an AJAX request to the server to get product data
+        $.ajax({
+            type: "GET",
+            url: "/get_products",
+            data: { category: category },
+            success: function (response) {
+                if (response["result"] === "success") {
+                    $("#post-box").empty();
+                    let posts = response["posts"];
+                    if (posts.length === 0) {
+                        // Render an error message when there is no data
+                        let errorHtml = `
+                        
+                           
+                        `;
+                        $("#post-box-container").append(errorHtml);
+                    } else {
+                        // Render the product cards when there is data
+                        for (let i = 0; i < posts.length; i++) {
+                            let post = posts[i];
+                            let html_temp = `
+                            <div class="col mb-3">
+                                <div class="card h-100">
+                                    <img src="/static/${post['foto']}"
+                                    class="card-img-top" alt="..." style="height: 200px; object-fit: cover;">
+                                    <div class="card-body">
+                                        <h5 class="card-title "><strong>${post['namaBarang']}</strong></h5>
+                                        <div class="d-flex flex-column">
+                                            <p class="my-0" style=""><strong>${formatPrice(post['harga'])}</strong></p>
+                                            <p class="my-0">Stok : ${post['jumlah']} pcs</p>
+                                        </div>
+                                        <p>${post['desc']} </p>
+                                        <div class="d-flex justify-content-center">
+                                            
+                                        </div>
+                                        <!-- tombol edit -->
+                                        <div class="d-flex justify-content-center">
+                                            <button type="button" data-bs-toggle="modal" data-bs-target="#editProduct"class="edit-btn btn btn-warning" id="barang-${i}" data-harga="${post['harga']}"
+                                            data-kategori="${post['kategori']}" data-nama="${post['namaBarang']}"
+                                            data-jumlah="${post['jumlah']}" data-desc="${post['desc']}" data-foto="${post['foto']}" data-id="${post['_id']}"
+                                            onclick="editItem(this.id)" style="width: 95%;">Edit
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+            
+                            `;
+                            $("#post-box").append(html_temp);
+                        }
+                    }
+                } else {
+                    // Handle the error case if needed
+                    console.error("Error fetching data");
+                }
+            },
+            error: function () {
+                // Handle the error case if the AJAX request fails
+                console.error("Error fetching data");
+            }
+        });
+    }
+    
+    function is_desc_prod(asValue) {
+        var regExp = /^([A-Za-z0-9()\/@*.,:!@#$%\s]{0,25})?$/;
+        return regExp.test(asValue);
+    }
+    function count_char_desc() {
+        // Ambil nilai dari textarea
+        var deskripsi = $("#deskripsi").val();
+        const max = 50;
+
+        // Trim the input to enforce maxlength
+        if (deskripsi.length > max) {
+            $("#deskripsi").val(deskripsi.substring(0, max));
+            deskripsi = $("#deskripsi").val();
+        }
+
+        // Hitung panjang karakter
+        var charCount = max - deskripsi.length;
+
+        // Update tampilan panjang karakter
+        $("#charCount").text('Deskripsi (' + (max - charCount) + '/' + max + ')');
+
+        // peringatan maksimal
+        if (deskripsi.length === max) {
+            $('#info-descripsi')
+                .text('Karakter sudah maksimal!')
+                .removeClass('d-none');
+            $("#deskripsi").focus();
+            return;
+        } else {
+            $('#info-descripsi')
+                .text('')
+                .addClass('d-none');
+        }
+
+    }
+    function editItem(id) {
+        let item_id = $('#' + id);
+        var id_barang = item_id.data('id');
+        var nama = item_id.data('nama');
+        var desc = item_id.data('desc');
+        var harga = item_id.data('harga');
+        var jumlah = item_id.data('jumlah');
+        var foto = item_id.data('foto');
+        var kategori = item_id.data('kategori');
+        $('#id_barang_update').val(id_barang);
+        $('#namaBarang').val(nama);
+        $('#desc').val(desc);
+        $('#harga').val(harga);
+        $('#jumlah').val(jumlah);
+        $('#kategori').val(kategori);
+        $("#img-produk").attr("src", "/static/" + foto);
+        let descleng = $('#desc').val();
+        let max = 25;
+        // Hitung panjang karakter
+        var charCount = max - descleng.length;
+        // Update tampilan panjang karakter
+        $("#charCount").text('Deskripsi (' + charCount + '/25)');
+
+        // menghitung jumlah karakter pada deskripsi
+        count_char();
+
+    }
+    function updateItem() {
+        $('#namaBarang').val();
+        $('#desc').val();
+        $('#harga').val();
+        $('#jumlah').val();
+        $('#kategori').val();
+
+        $('#formEditPrduct').submit();
+
+
+    }
+    function refresh() {
+        $('#toserbaname').val("{{data['toserbaname']}}");
+        $('#email').val("{{data['email']}}");
+        $('#deskripsi').val("{{data['profile_info']}}");
+        $('#alamat').val("{{data['alamat']}}");
+        $('#foto').val("{{data['profile_pic']}}");
+        $('#no_telp').val("{{data['no_telp']}}");
+        // menghitung karakter pada deskrip yg pernah dimasukkan
+        count_char_desc();
+    }
+    function count_char() {
+
+        // Ambil nilai dari textarea
+        var desc = $("#desc").val();
+        let max = 25;
+
+        // Trim the input to enforce maxlength
+        if (desc.length > max) {
+            $("#desc").val(desc.substring(0, max));
+            desc = $("#desc").val();
+        }
+
+        // Hitung panjang karakter
+        var charCount = max - desc.length;
+        // Update tampilan panjang karakter
+        $("#charCountEdit").text('Deskripsi (' + (max - charCount) + '/25)');
+        // peringatan validasi
+        if (desc.length === max) {
+            $('#info-desc')
+                .text('Karakter sudah maksimal')
+                .removeClass('d-none');
+            $("#desc").focus();
+            return;
+        } else {
+            $('#info-desc')
+                .text('')
+                .addClass('d-none');
+        }
+
+
+    }
+    function is_desc(asValue) {
+        var regExp = /^([A-Za-z0-9()\/@*.,:!@#$%\s]{0,50})?$/;
+        return regExp.test(asValue);
+    }
+
+    function is_password(asValue) {
+        var regExp = /^[0-9a-zA-Z!@#$%^&*]{8,20}$/;
+        return regExp.test(asValue);
+    }
+    function is_telephone(asValue) {
+        // karena optional
+        // Nomor telepon minimal 0 digit, maksimal 15 digit 
+        var regExp = /^\d{0,15}$/;
+        return regExp.test(asValue);
+    }
+    function is_name(asValue) {
+        // boleh huruf dan angka, minimal 3 char, maksimal 15 char, 
+        var regExp = /^[a-zA-Z0-9_-]{3,20}$/;
+        return regExp.test(asValue);
+    }
+    function is_email(asValue) {
+        var regExp = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        return regExp.test(asValue);
+    }
+    function is_foto(asValue) {
+        //hanya menerima jpg, jpeg dan png
+        var regExp = /^.*\.(jpg|jpeg|png)$/i;
+        // ukuran maksimal 2MB
+        var maxFileSize = 2000000; // 2MB
+        return regExp.test(asValue.name.toLowerCase()) && asValue.size <= maxFileSize;
+    }
+    function submitForm() {
+        let password = $('#password').val()
+        let newPassword = $('#newPassword').val()
+        let toserbaname = $('#toserbaname').val()
+        let email = $('#email').val()
+        let deskripsi = $('#deskripsi').val()
+        let no_telp = $('#no_telp').val()
+        let foto = $('#foto')[0].files[0];
+
+        if (toserbaname === '') {
+            $('#info-name')
+                .text('Nama toko tidak boleh kosong!')
+                .removeClass('d-none');
+            $("#toserbaname").focus();
+
+            return;
+        }
+        if (!is_name(toserbaname)) {
+            $('#info-name')
+                .text('Hanya masukkan angka dan huruf, minimal 3 karakter Maksimal 20 karakter !')
+                .removeClass('d-none');
+            $("#tosebaname").focus();
+            return;
+        }
+        if (email === '') {
+            $('#info-email')
+                .text('Email toko tidak boleh kosong!')
+                .removeClass('d-none');
+            $("#email").focus();
+            return;
+        }
+        if (!is_email(email)) {
+            $('#info-email')
+                .text('Masukkan email')
+                .removeClass('d-none');
+            $("#email").focus();
+            return;
+        }
+        if (password && newPassword || password && !newPassword) {
+            if (!is_password(newPassword) || !is_password(password)) {
+                $('#info-password')
+                    .text('Silakan masukkan 8-20 karakter  huruf, angka, atau karakter khusus berikut (!@#$%^&*)')
+                    .removeClass('d-none');
+                $("#password").focus();
+                return;
+            }
+        }
+
+
+        if (!is_telephone(no_telp)) {
+            $('#info-no_telp')
+                .text('Hanya masukkan angka, Maksimal 15 digit !')
+                .removeClass('d-none');
+            $("#no_telp").focus();
+            return;
+        }
+        if (foto) {
+            if (!is_foto(foto)) {
+                $('#info-foto')
+                    .text('Hanya menerima JPG, JPEG dan PNG, Maksimal 2MB !')
+                    .removeClass('d-none');
+                $("#foto").focus();
+                return;
+            }
+        }
+        if (!is_desc(deskripsi)) {
+            $('#info-descripsi')
+                .text('Maksimal 25 karakter,atau karakter khusus berikut (/@*.,:!@#$%)!')
+                .removeClass('d-none');
+            $("#deskripsi").focus();
+            return;
+        }
+
+
+        // Mengambil referensi ke formulir
+        // Melakukan pengiriman formulir secara manual
+        $('#formEditProfile').submit();
+    }
+
+</script>
+{% endblock %}
+
+{% block navbar %}
+<a href="/home" class="link-list ">Home</a>
+<a href="/dashboard" class="link-list">Dashboard</a>
+<a href="#" class="link-list nav-active ">Profile</a>
+{% endblock %}
+
+{% block konten %}
+<div class="container-fluid" style="background-color: #ffde59;">
+    <br>
+    <div class="container-sm  d-flex  justify-content-center flex-wrap">
+        <div class=" profileimg flex-warap flex-column d-flex align-items-center flex-center">
+            <div class="my-3" style="height: 10rem; width:10rem; border-radius:50%; overflow:hidden">
+                <img src="{{ url_for('static', filename=data['profile_pic_real']) }}" alt="" class="img-circle"
+                    style="height: 100%;">
+
+            </div>
+
+            <h5>{{data['toserbaname']}}</h5>
+
+            <div>
+                <a href="mailto:{{data['email']}}" style="text-decoration: none; color:#2c93f3">{{data['email']}}</a>
+            </div>
+            <div class="mt-2">
+                <button type="button" style="border: unset; border-radius:10px; background-color:unset"
+                    data-bs-toggle="modal" data-bs-target="#editProfile" onclick="refresh()"><i
+                        class="fa-solid fa-pen-to-square" style="color: #1d3a6d;"></i>Edit</button>
+            </div>
+        </div>
+
+
+        <div class="desprofile ">
+            <div class="desc">
+                <div class="mx-1 wicon"><i class="fa-solid fa-shop" style="color: #000000;"></i></div>
+                <div class="mx-1 wket">Produk</div>
+                <div class="mx-1">:</div>
+                <div class="mx-1">{{total_items}}</div>
+            </div>
+            <div class="desc">
+                <div class="mx-1 wicon"><i class="fa-solid fa-location-dot" style="color: #ff0000;"></i></div>
+                <div class="mx-1 wket">Alamat</div>
+                <div class="mx-1">:</div>
+                <div class="mx-1"><a href="{{data['alamat']}}" target="_blank"
+                        style="text-decoration: none; color:#2c93f3">{{data['alamat']}}</a></div>
+            </div>
+            <div class="desc">
+                <div class="mx-1 wicon"><i class="fa-brands fa-whatsapp" style="color: #1b9834;"></i></div>
+                <div class="mx-1 wket">Telepon</div>
+                <div class="mx-1">:</div>
+                <div class="mx-1">{{data['no_telp']}}</div>
+            </div>
+            <div class="desc">
+                <div class="mx-1 wicon"><i class="fa-solid fa-circle-info" style="color: #0c136e;"></i></div>
+                <div class="mx-1 wket">Deskripsi</div>
+                <div class="mx-1">:</div>
+                <div class="mx-1">{{data['profile_info']}}</div>
+            </div>
+        </div>
+        <div class="container d-flex justify-content-center">
+            <div class="navbar">
+                <a id="SemuaLink" class="myswitch nav-active mx-2" onclick="kategori(this.id)"
+                    style="cursor: pointer;">Semua</a>
+                <a id="SembakoLink" class="myswitch mx-2" onclick="kategori(this.id)"
+                    style="cursor: pointer;">Sembako</a>
+                <a id="PerabotanLink" class="myswitch mx-2" onclick="kategori(this.id)"
+                    style="cursor: pointer;">Parabot</a>
+                <a id="MakananLink" class="myswitch mx-2" onclick="kategori(this.id)"
+                    style="cursor: pointer;">Makanan</a>
+                <a id="MinumanLink" class="myswitch mx-2" onclick="kategori(this.id)"
+                    style="cursor: pointer;">Minuman</a>
+                <a id="ElektronikLink" class="myswitch mx-2" onclick="kategori(this.id)"
+                    style="cursor: pointer;">Elektronik</a>
+                <a id="LainnyaLink" class="myswitch mx-2" onclick="kategori(this.id)"
+                    style="cursor: pointer;">Lainnya</a>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+<div>
+    
+</div>
+<div class="container-lg mt-5" id="post-box-container">
+    <h5>Daftar Produk</h5>
+    <div class="row row-cols-1 row-cols-md-4 g-10" id="post-box">
+        <!-- card barang -->
+        
+
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="editProfile" tabindex="-1" aria-labelledby="editProfile" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="titleModal">Edit Profile</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form action="/profile/edit" method="post" enctype="multipart/form-data" id="formEditProfile">
+
+                    <div class="mb-3">
+                        <label for="toserbaname" class="form-label">Toserba name</label>
+                        <input type="text" class="form-control" id="toserbaname" name="toserbaname"
+                            value="{{data['toserbaname']}}">
+                        <p id="info-name" class="text-danger d-none"></p>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email address</label>
+                        <input type="email" class="form-control" id="email" name="email" value="{{data['email']}}">
+                        <p id="info-email" class="text-danger d-none"></p>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newPassword" class="form-label">Edit password</label>
+                        <div class="d-flex">
+                            <input type="password" class="form-control me-2" id="password" name="password"
+                                placeholder="password">
+                            <input type="password" class="form-control ms-2" id="newPassword" name="newPassword"
+                                placeholder="new password">
+                        </div>
+                        <p id="info-password" class="text-danger d-none"></p>
+
+                    </div>
+                    <div class="mb-3">
+                        <label for="no_telp" class="form-label">No Telepon/WA </label>
+                        <input class="form-control" type="tel" id="no_telp" name="no_telp" value="{{data['no_telp']}}">
+                        <p id="info-no_telp" class="text-danger d-none"></p>
+                    </div>
+                    <div class="mb-3">
+                        <label for="alamat" class="form-label">Link google Map </label>
+                        <input class="form-control" type="url" id="alamat" name="alamat" value="{{data['alamat']}}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="foto" class="form-label">Foto </label>
+                        <input class="form-control" type="file" id="foto-prof" name="foto-prof"
+                            value="{{data['profile_pic']}}">
+                        <p id="info-foto" class="text-danger d-none"></p>
+                    </div>
+                    <div class="mb-3">
+                        <label for="deskripsi" class="form-label" id="charCount">Deskripsi</label>
+                        <textarea class="form-control" id="deskripsi" rows="3" name="desc"
+                            oninput="count_char_desc()">{{data['profile_info']}}</textarea>
+                        <p id="info-descripsi" class="text-danger d-none"></p>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                <button type="button" class="btn btn-primary" onclick="submitForm()">Simpan perubahan</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal edit barang -->
+<div class="modal fade" id="editProduct" tabindex="-1" aria-labelledby="editProduct" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="titleModal">Edit Produk</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form action="/produk/update" method="post" enctype="multipart/form-data" id="formEditPrduct">
+                    <input type="hidden" name="id_barang_update" id="id_barang_update">
+                    <div class="mb-3 d-flex justify-content-center">
+                        <div class="my-3" style="height: 10rem; width:10rem;  overflow:hidden">
+                            <img id="img-produk" src="" alt="" style="height: 100%;">
+
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="namaBarang" class="form-label">Nama Barang</label>
+                        <input type="text" class="form-control" id="namaBarang" name="namaBarang">
+                        <p id="info-name" class="text-danger d-none"></p>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="kategori" class="form-label">Kategori</label>
+                        <select class="form-select" id="kategori" name="kategori" aria-label="dropdown kategori"
+                            required>
+                            <option value="Elektronik">Elektronik</option>
+                            <option value="Kebersihan">Kebersihan</option>
+                            <option value="Kecantikan">Kecantikan</option>
+                            <option value="Makanan">Makanan</option>
+                            <option value="Minuman">Minuman</option>
+                            <option value="Sembako">Sembako</option>
+                            <option value="Perabotan">Perabotan</option>
+                            <option value="Lainnya">Lainnya</option>
+                        </select>
+                        <p id="info-kategori" class="text-danger d-none"></p>
+                    </div>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <div class="me-2">
+                                <label for="jumlah" class="form-label">Jumlah</label>
+                                <input type="number" class="form-control " id="jumlah" name="jumlah" required>
+                            </div>
+                            <div class="ms-2">
+                                <label for="harga" class="form-label">Harga</label>
+                                <input type="number" class="form-control " id="harga" name="harga" required>
+                            </div>
+                        </div>
+                        <p id="info-harga" class="text-danger d-none"></p>
+                        <p id="info-jumlah" class="text-danger d-none"></p>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="foto" class="form-label">Foto </label>
+                        <input class="form-control" type="file" id="foto" name="foto">
+                        <p id="info-foto" class="text-danger d-none"></p>
+                    </div>
+                    <div class="mb-3">
+                        <label for="desc" class="form-label" id="charCountEdit">Deskripsi</label>
+                        <textarea class="form-control" id="desc" rows="3" name="desc" oninput="count_char()"></textarea>
+                        <p id="info-desc" class="text-danger d-none"></p>
+                    </div>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                    <button type="button" class="btn btn-primary" data-bs-target="#editkonfirmasi"
+                        data-bs-toggle="modal">Simpan perubahan</button>
+                </form>
+            </div>
+            <div class="modal-footer">
+
+
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="editkonfirmasi" aria-hidden="true" aria-labelledby="editProdukKonfirmasi" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5" id="editProdukKonfirmasi">Ubah</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Apakah anda yakin ?
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-warning" data-bs-dismiss="modal" onclick="updateItem()">Konfirmasi</button>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editProduct">Kembali</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
